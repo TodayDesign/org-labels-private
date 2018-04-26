@@ -2,7 +2,7 @@
 
 [![NPM Version](https://img.shields.io/npm/v/org-labels.svg?style=flat)](https://www.npmjs.org/package/org-labels)
 [![NPM Downloads](https://img.shields.io/npm/dm/org-labels.svg?style=flat)](https://www.npmjs.org/package/org-labels)
-[![Node.js Version](https://img.shields.io/badge/io.js-≥_1.1.0-orange.svg?style=flat)](http://nodejs.org/download/)
+[![Node.js Version](https://img.shields.io/badge/io.js->=_1.1.0-orange.svg?style=flat)](http://nodejs.org/download/)
 
 A tool to help manage organization-wide GitHub issue labels.
 
@@ -22,7 +22,7 @@ Requires [io.js](https://iojs.org/en/index.html) 1.1.0+ — you can use a node v
 
 #### GitHub Security
 
-org-labels uses [`ghauth`](https://github.com/rvagg/ghauth) for GitHub authentication.
+org-labels uses [`ghuath`](https://github.com/rvagg/ghauth) for GitHub authentication.
 The version is fixed, and I have done a rough review of its code.
 
 ### Commands

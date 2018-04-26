@@ -80,7 +80,7 @@ function* _org_labels(fn, args) {
       configName: 'org-labels'
     , userAgent : 'org-labels'
     , note      : 'org-labels CLI tool'
-    , scopes    : []
+    , scopes    : ['repo']
   })
 
   yield check_github_ratelimit(auth)

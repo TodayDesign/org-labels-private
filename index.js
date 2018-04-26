@@ -1,4 +1,5 @@
 var request = require('request-promise')
+var RateLimiter = require('request-rate-limiter');
 
 /*
  * checks that a string is a valid hex color code without the preceding `#`
@@ -50,6 +51,9 @@ proto.handle_repo_labels = handle_repo_labels
 proto.get_repos          = get_repos
 proto.handle_label       = handle_label
 proto.send_label         = send_label
+
+var limiter = new RateLimiter(120);
+
 
 
 /*
@@ -119,7 +123,8 @@ function* standardize(args) {
     config_repo = org + '/' + config_repo
   }
 
-  var res = yield request({
+  console.log('https://api.github.com/repos/' + config_repo + '/contents/config/github_labels.json')
+  var res = yield limiter.request({
       uri    : 'https://api.github.com/repos/' + config_repo + '/contents/config/github_labels.json'
     , headers: header
     , auth   : this.auth
@@ -150,13 +155,13 @@ function* standardize(args) {
   var i    = repos.length
   var reqs = []
   while (i--) {
+    console.log(repos[i])
     reqs.push(this.handle_repo_labels(org, repos[i], config, this.opts.destructive))
   }
   var results = yield reqs
 
-  var info = log_results(results)
+  console.log(results)
 
-  console.log('%d label updates across %d repos', info.updates, info.repos)
   console.log('done standardizing labels')
 }
 
@@ -168,7 +173,7 @@ function* standardize(args) {
 function* handle_repo_labels(org, repo, config, destructive) {
 
   var uri = 'https://api.github.com/repos/' + org + '/' + repo + '/labels'
-  var res = yield request({
+  var res = yield limiter.request({
       uri    : uri
     , headers: header
     , method : 'GET'
@@ -183,20 +188,25 @@ function* handle_repo_labels(org, repo, config, destructive) {
   var results = []
 
   var i = list.length
+  console.log(`list length: ${i}`)
   while (i--) {
     item = list[i]
-
-    results.push(request({
+    console.log(i)
+    console.log(item)
+    console.log(uri + (item.method === 'POST' ? '' : '/' + item.name))
+    var res = yield limiter.request({
         uri    : uri + (item.method === 'POST' ? '' : '/' + item.name)
       , headers: header
       , method : item.method
       , json   : item
       , auth   : this.auth
       , resolveWithFullResponse: true
-    }))
+    })
+    console.log(JSON.stringify(res.body))
+    results.push(JSON.stringify(res.body))
   }
 
-  return yield results
+  return results
 }
 
 /*
@@ -208,7 +218,7 @@ function compare_labels(config, _existing, destructive) {
   var out = []
   var i   = config.length
   // don't splice the actual array
-  var existing = _existing.slice(0)
+  var existing = _existing
 
   while (i--) {
     var wanted = config[i]
@@ -260,22 +270,20 @@ function* get_repos(org) {
 
   // handle github pagination for orgs with many repos
   while (++page) {
-    var res = yield request({
-        uri    : 'https://api.github.com/users/' + org + '/repos?page=' + page
+    var res = yield limiter.request({
+        uri    : 'https://api.github.com/orgs/' + org + '/repos?page=' + page
       , headers: header
       , auth   : this.auth
       , json   : true
     }).catch(log_request_err('error retrieving org\'s repos:'))
 
-    if (!res) continue
-
-    var i = res.length
+    var i = res.body.length
     while (i--) {
-      repos.push(res[i].name)
+      repos.push(res.body[i].name)
     }
 
     // if this page has less repos than the last, then it is the last page.
-    if (res.length < last_length) break
+    if (res.body.length === 0) break
 
     last_length = res.length
   }
@@ -322,14 +330,14 @@ function* send_label(org, repos, opts, method) {
   var uri = 'https://api.github.com/repos/' + org + '/'
 
   while (i--) {
-    arr.push(request({
+    arr.push(limiter.request({
         uri    : uri + repos[i] + '/labels' + (opts.ext ? '/' + opts.ext : '')
       , headers: header
       , method : method || opts.method
       , json   : opts
       , auth   : this.auth
       , resolveWithFullResponse: true
-    }))
+    }).catch(console.log(`error sending labels from a repo: ${repos[i]}`)))
   }
 
   return yield arr
@@ -402,7 +410,8 @@ function log_result(result, label) {
  */
 function log_request_err(msg) {
   return function (err) {
-    if (err.response.headers['x-ratelimit-remaining']>>0 === 0) {
+    console.log(err)
+    if (err.response && err.response.headers['x-ratelimit-remaining']>>0 === 0) {
       console.log('Exceded GitHub rate-limit. Bailing.')
       return process.exit()
     }
