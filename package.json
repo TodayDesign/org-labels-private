@@ -1,0 +1,41 @@
+{
+  "name": "org-labels",
+  "description": "A tool to help manage organization-wide GitHub issue labels.",
+  "version": "2.0.0",
+  "author": "Jeremiah Senkpiel <fishrock123@rocketmail.com> (https://searchbeam.jit.su)",
+  "license": "MIT",
+  "repository": "repo-utils/org-labels",
+  "keywords": [
+    "github",
+    "repo",
+    "organization",
+    "issues",
+    "issue",
+    "labels",
+    "label",
+    "tags",
+    "tag"
+  ],
+  "dependencies": {
+    "bluebird": "^2.9.24",
+    "co": "^4.5.1",
+    "commander": "^2.7.1",
+    "ghauth": "2.0.0",
+    "moment": "^2.10.2",
+    "request-promise": "^0.4.1",
+    "request-rate-limiter": "^1.0.2",
+    "semver": "^4.3.3"
+  },
+  "engines": {
+    "node": ">= 1.1.0"
+  },
+  "files": [
+    "LICENSE",
+    "index.js",
+    "bin"
+  ],
+  "bin": {
+    "org-labels": "./bin/org-labels"
+  },
+  "preferGlobal": true
+}
