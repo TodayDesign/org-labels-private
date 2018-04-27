@@ -52,7 +52,7 @@ proto.get_repos          = get_repos
 proto.handle_label       = handle_label
 proto.send_label         = send_label
 
-var limiter = new RateLimiter(120);
+var limiter = new RateLimiter(40);
 
 
 
@@ -135,6 +135,7 @@ function* standardize(args) {
   if (!res) process.exit()
 
   // github sends the body (json file) as base64
+  console.log(res.body)
   var config = JSON.parse(new Buffer(res.body.content, 'base64').toString('utf8'))
   if (!Array.isArray(config))
     throw new Error('error: github_labels.json must be a json array')
@@ -184,6 +185,8 @@ function* handle_repo_labels(org, repo, config, destructive) {
   if (!res) return []
 
   var list = compare_labels(config, res, destructive)
+  console.log(list)
+  return list
 
   var results = []
 
@@ -218,7 +221,8 @@ function compare_labels(config, _existing, destructive) {
   var out = []
   var i   = config.length
   // don't splice the actual array
-  var existing = _existing
+  var existing = _existing.body
+  console.log(existing)
 
   while (i--) {
     var wanted = config[i]
