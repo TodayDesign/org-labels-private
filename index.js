@@ -185,8 +185,6 @@ function* handle_repo_labels(org, repo, config, destructive) {
   if (!res) return []
 
   var list = compare_labels(config, res, destructive)
-  console.log(list)
-  return list
 
   var results = []
 
