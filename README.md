@@ -1,4 +1,4 @@
-## private-org-labels
+## org-labels-private
 
 forked from [repo-utils/org-labels](https://github.com/repo-utils/org-labels)
 
