@@ -8,8 +8,12 @@ var valid_color = /^([0-9A-F]{3}$|[0-9A-F]{6}$)/i
 
 /*
  * GitHub api requires a `User-Agent` header.
+ * Managing label descriptions via API is in beta. Requires the following Accept header.
  */
-var header = { 'User-Agent': 'org-labels' }
+var header = { 
+  'User-Agent': 'org-labels',
+  'Accept': 'application/vnd.github.symmetra-preview+json'
+}
 
 /*
  * expose `Labeler`
@@ -52,7 +56,10 @@ proto.get_repos          = get_repos
 proto.handle_label       = handle_label
 proto.send_label         = send_label
 
-var limiter = new RateLimiter(40);
+var limiter = new RateLimiter({
+  rate: 40,
+  maxWaitingTime: 1000
+});
 
 
 
@@ -135,7 +142,6 @@ function* standardize(args) {
   if (!res) process.exit()
 
   // github sends the body (json file) as base64
-  console.log(res.body)
   var config = JSON.parse(new Buffer(res.body.content, 'base64').toString('utf8'))
   if (!Array.isArray(config))
     throw new Error('error: github_labels.json must be a json array')
@@ -156,7 +162,6 @@ function* standardize(args) {
   var i    = repos.length
   var reqs = []
   while (i--) {
-    console.log(repos[i])
     reqs.push(this.handle_repo_labels(org, repos[i], config, this.opts.destructive))
   }
   var results = yield reqs
@@ -174,6 +179,7 @@ function* standardize(args) {
 function* handle_repo_labels(org, repo, config, destructive) {
 
   var uri = 'https://api.github.com/repos/' + org + '/' + repo + '/labels'
+  console.log('handle_repo_labels')
   var res = yield limiter.request({
       uri    : uri
     , headers: header
@@ -193,8 +199,8 @@ function* handle_repo_labels(org, repo, config, destructive) {
   while (i--) {
     item = list[i]
     console.log(i)
-    console.log(item)
-    console.log(uri + (item.method === 'POST' ? '' : '/' + item.name))
+    console.log('request uri ',uri + (item.method === 'POST' ? '' : '/' + item.name))
+    console.log('with item', item)
     var res = yield limiter.request({
         uri    : uri + (item.method === 'POST' ? '' : '/' + item.name)
       , headers: header
@@ -203,7 +209,7 @@ function* handle_repo_labels(org, repo, config, destructive) {
       , auth   : this.auth
       , resolveWithFullResponse: true
     })
-    console.log(JSON.stringify(res.body))
+    console.log('request successful, response:\n',JSON.stringify(res.body))
     results.push(JSON.stringify(res.body))
   }
 
@@ -220,7 +226,7 @@ function compare_labels(config, _existing, destructive) {
   var i   = config.length
   // don't splice the actual array
   var existing = _existing.body
-  console.log(existing)
+  console.log('existing labels: ',existing)
 
   while (i--) {
     var wanted = config[i]
@@ -231,11 +237,13 @@ function compare_labels(config, _existing, destructive) {
     while (j--) {
       current = existing[j]
       if (wanted.name !== current.name) continue
+      console.log('wanted.desc?', wanted.description)
 
       existing.splice(j, 1)
       next = {
           name  : wanted.name
         , color : wanted.color
+        , description: wanted.description
         , method: 'PATCH'
       }
       break
@@ -245,6 +253,7 @@ function compare_labels(config, _existing, destructive) {
     out.push(next || {
         name  : wanted.name
       , color : wanted.color
+      , description: wanted.description
       , method: 'POST'
     })
   }
@@ -272,6 +281,7 @@ function* get_repos(org) {
 
   // handle github pagination for orgs with many repos
   while (++page) {
+    console.log('get page of repos', 'https://api.github.com/orgs/' + org + '/repos?page=' + page)
     var res = yield limiter.request({
         uri    : 'https://api.github.com/orgs/' + org + '/repos?page=' + page
       , headers: header
@@ -307,6 +317,7 @@ function* handle_label(org, method, opts, done) {
   var results = yield* this.send_label(org, repos, opts, method)
 
   var i = results.length
+  console.log('finished results')
   while (i--) {
      log_result(results[i], opts.name)
   }
@@ -329,9 +340,13 @@ function* handle_label(org, method, opts, done) {
 function* send_label(org, repos, opts, method) {
   var arr = []
   var i   = repos.length
+  var completed = 0
   var uri = 'https://api.github.com/repos/' + org + '/'
 
-  while (i--) {
+  console.log('get ready to send a label update for each one in the repo')
+
+  while (--i) {
+    console.log('push label to ', uri + repos[i] + '/labels' + (opts.ext ? '/' + opts.ext : ''))
     arr.push(limiter.request({
         uri    : uri + repos[i] + '/labels' + (opts.ext ? '/' + opts.ext : '')
       , headers: header
@@ -339,7 +354,17 @@ function* send_label(org, repos, opts, method) {
       , json   : opts
       , auth   : this.auth
       , resolveWithFullResponse: true
-    }).catch(console.log(`error sending labels from a repo: ${repos[i]}`)))
+    }).then(function(res) {
+      if(completed === 0) {
+        console.log('res.request.uri', res.request.uri)
+      }
+      process.stdout.write(`\e[0K\rCompleted ${++completed} of ${repos.length}: ${res.request.uri.path} with status ${res.headers.status}`)
+    })
+    .catch(function(err) {
+      console.log(`error sending labels from a repo:`, err)
+      // console.log('headers', JSON.stringify(err.response.headers) +'\n')
+      // console.log('body', err.response.body)
+    }))
   }
 
   return yield arr
